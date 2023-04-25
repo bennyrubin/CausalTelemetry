@@ -55,6 +55,19 @@ RIBTable = {}
 local_prefs = {}
 logical_clock = 0
 
+def set_keepalive_linux(sock:socket.socket, after_idle_sec=1, interval_sec=3, max_fails=2):
+    """Set TCP keepalive on an open socket.
+
+    It activates after 1 second (after_idle_sec) of idleness,
+    then sends a keepalive ping once every 3 seconds (interval_sec),
+    and closes the connection after 5 failed ping (max_fails), or 15 seconds
+    """
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, after_idle_sec)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, interval_sec)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, max_fails)
+    #sock.settimeout(.5)
+
 
 def initiate_connections(neighbors):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -86,33 +99,50 @@ def initiate_connections(neighbors):
             print(f"ASN {ASN} was connected to")
     
     print(f"ASN {ASN} has {len(client_sockets)} sockets")
+    [set_keepalive_linux(sock) for sock in client_sockets]
     return client_sockets
+
+def get_eventID():
+    global logical_clock
+    id = f"{ASN},{logical_clock}"
+    logical_clock += 1
+    return id
 
 def send_server(message):
     causal_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     addr = (SERVER_IP, 55555)
-    causal_socket.sendto(message, addr)
+    causal_socket.sendto(message.encode(), addr)
     
-def send_and_log():
+def log_send(message):
     # every send message should embed the event ID, semi-colon seperated
     # eventID;message --> node_id,timestamp;message
-    pass
+    # wrap this around every sendall function message 
+    # after should embed the eventID into the message and then return the string with eventID;message
+    # while also sending it to the server with the eventID and message
+    eventID = get_eventID()
+    new_message = f"{eventID};{message}"
+    server_message = f"send {eventID} {message}"
+    send_server(server_message)
+    return new_message
 
-def recv_and_log(updates):
+def log_recv(updates):
     global logical_clock
     # eventID;message --> node_id,timestamp;message
     stripped_updates = []
     for update in updates:
         send_eventID, stripped_update = update.split(";")
         stripped_updates.append(stripped_update)
-        message = f"receive {send_eventID} {ASN},{logical_clock}"
+        message = f"receive {send_eventID} {get_eventID()} {stripped_update}"
+        send_server(message)
         logical_clock += 1
     # every receive should parse the embed event ID 
     # TODO: grab the info I need and then strip it before returning it
     return stripped_updates
 
-def log_internal():
-    pass
+def log_internal(message):
+    eventID = get_eventID()
+    message = f"internal {eventID} {message}"
+    send_server(message)
 
 def read_updates(sock):
     # read until I end with a newline. Could have multiple requests
@@ -125,7 +155,7 @@ def read_updates(sock):
         buffer += data.decode()
         if buffer.endswith("\n"):
             updates = buffer.split("\n")[:-1]
-            return updates
+            return log_recv(updates)
         
 def select_route(sockets, prefix, neighbor_from):
     global RIBTable
@@ -141,6 +171,7 @@ def select_route(sockets, prefix, neighbor_from):
         for sock in sockets:
             if sock.getpeername()[0] != neighbor_from:
                 message = f"withdraw {prefix} {sock.getsockname()[0]} empty\n"
+                message = log_send(message)
                 sock.sendall(message.encode())
         return
 
@@ -163,6 +194,10 @@ def select_route(sockets, prefix, neighbor_from):
         elif len(route.as_path) < len(best_route.as_path): # then check as_path length
             best_key = key
 
+    # if the best_route is the same as the previous selected route, don't need to update
+    if RIBTable[best_key].selected:
+        return 
+
     if ASN == "3":
         print(f"best route: {best_key}")
 
@@ -180,6 +215,7 @@ def select_route(sockets, prefix, neighbor_from):
         if sock.getpeername()[0] != neighbor_from:
             as_path = ",".join(RIBTable[best_key].as_path) + f",{ASN}"
             message = f"update {prefix} {sock.getsockname()[0]} {as_path}\n"
+            message = log_send(message)
             sock.sendall(message.encode())
     # TODO: remove current route to IP address in linux routing table (might have to do this before I over-write the route)
     # if selected_route exists then set selected to 0 
@@ -252,8 +288,8 @@ def process_updates(sockets, updates):
                 del RIBTable[key]
             else:
                 print(f"{ASN} tried to withdraw {key}, but not in table")
-
-            # TODO: take it out of the RIBtable and linux routing table
+        else:
+            raise Exception("action not known")
 
         select_route(sockets, rib_entry.prefix, rib_entry.next_hop)
 
@@ -278,6 +314,7 @@ def main():
     global ASN
     global local_prefs
     global SOURCE
+    global RIBTable
 
     parser = argparse.ArgumentParser()
 
@@ -300,6 +337,10 @@ def main():
     SOURCE = ip[:-4] + "1"
     sockets = initiate_connections(neighbors)
 
+    saved_addr = {}
+    for sock in sockets:
+        saved_addr[sock] = sock.getpeername()
+
     # <update/withdraw> prefix neighbor as1,as2,as3 
 
     # send announcements for neighbors. 
@@ -307,8 +348,9 @@ def main():
         print(f"socket name: {sock.getsockname()}")
         addr = sock.getsockname()[0]
         message = f"update {ip} {addr} {ASN}\n"
+        message = log_send(message)
         sock.sendall(message.encode())
-
+    time.sleep(.5)
     future = time.time() + 3
     sent = False
     message = b'test'
@@ -316,9 +358,64 @@ def main():
     while True:
         read_sockets, write_sockets, error_sockets = select.select(sockets, [], [], .5)
 
+        # print("SLKDJFKL:SDJKLFJS")
+        # # test for links down
+        # for i, sock in enumerate(sockets):
+        #     try: 
+        #         print(f"{ASN} sock.getpeername()")
+        #     except OSError as e:
+        #         print(f"{saved_addr[sock]} disconnected")
+
+        # test for links down
+        for i, sock in enumerate(read_sockets):
+            try:
+                data = sock.recv(1, socket.MSG_PEEK)
+            except TimeoutError as e:
+                print(f"Socket {saved_addr[sock]} disconnected")
+                print(f"socket {sock.getsockname()} ")
+                # TODO: have to withdraw all the IP routes where next hop is this neighbor (get neighbor from saved_addr). In withdraw message the next_hop should be sock.getsockname()[0]
+                #print(f"{ASN} sending withdraw to {sock.getpeername()[0]} from {sock.getsockname()[0]} ")
+                #message = f"withdraw 10.0.2.0/24 {sock.getsockname()[0]} {ASN}\n"
+                #sock.sendall(message.encode())
+                print(list(RIBTable.keys())[0].next_hop)
+                print(list(RIBTable.keys())[0].next_hop == saved_addr[sock][0])
+                items = [(key, val) for (key, val) in RIBTable.items() if key.next_hop == saved_addr[sock][0]]
+                sockets.remove(sock) # remove the socket
+                print(items)
+
+                for key, val in items:
+                    if val.selected: # if it's selected then need to remove from kernel routing table and RIBTable and call select route
+                        command = f"ip route del {key.prefix}"
+                        subprocess.run(command, shell=True)
+                        del RIBTable[key]
+                        select_route(sockets, key.prefix, key.next_hop)
+                    else: # otherwise just need to remove it 
+                        del RIBTable[key]
+
+                # get all of the IP prefixes that neighbor was advertising from RIB. If any of the routes are selected, run select route on it after removing from table
+                # remove the socket from the list. delete the route from the routing table and RIBTable
+                # call select route
+
+                # TODO: MRAI timer 
+                # have a queue of messages that are waiting on their timer and check them in this main loop 
+                # keep track of destinations in a queue and advertise current selected route after timer is done (or withdraw if there is none)
+                
+
+
         for sock in read_sockets:
             updates = read_updates(sock)
             process_updates(sockets, updates)
+
+        # test for links down
+        # for sock in sockets:
+        #     try:
+        #         data = sock.recv(1)
+        #         print(f"DATA: {data}")
+        #         if data == b'':
+        #             print(f"{ASN} CONNECTION FAILED")
+        #     except TimeoutError:
+        #         print("continuing")
+        #         continue
         
 
         

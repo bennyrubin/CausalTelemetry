@@ -96,6 +96,8 @@ def main():
     net[ 'r1' ].popen('python3 -u simpleBGP.py --ip 10.0.0.0/24 --neighbor 1.1.2.2 true 100' , stdout=sys.stdout, stderr=sys.stdout)
     net[ 'r2' ].popen('python3 -u simpleBGP.py --ip 10.0.1.0/24 --neighbor 1.1.2.1 false 100 --neighbor 1.2.3.2 true 100', stdout=sys.stdout, stderr=sys.stdout)
     net[ 'r3' ].popen('python3 -u simpleBGP.py --ip 10.0.2.0/24 --neighbor 1.2.3.1 false 100', stdout=sys.stdout, stderr=sys.stdout)
+    net[ 'server' ].popen('python3 -u CausalServer.py',stdout=sys.stdout, stderr=sys.stdout)
+
 
     CLI(net)
     net.stop()
