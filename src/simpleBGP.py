@@ -86,6 +86,7 @@ def initiate_connections(neighbors):
             print(f"ASN {ASN} about to connect to {ip}")
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((ip, BGP_PORT))
+
             client_sockets.append(client_socket)
 
     while True:

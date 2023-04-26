@@ -45,8 +45,11 @@ class BGPTopo(Topo):
         r1 = self.addHost('r1', cls=LinuxRouter, ip='10.0.1.1/24')
         r2 = self.addHost('r2', cls=LinuxRouter, ip='10.0.2.1/24')
         r3 = self.addHost('r3', cls=LinuxRouter, ip='10.0.3.1/24')
+        r4 = self.addHost('r4', cls=LinuxRouter, ip='10.0.4.1/24')
+        r5 = self.addHost('r5', cls=LinuxRouter, ip='10.0.5.1/24')
+        
 
-        routers = [r1,r2,r3]
+        routers = [r1,r2,r3,r4,r5]
 
         for r in routers:
             self.add_subnet(r)
@@ -59,18 +62,40 @@ class BGPTopo(Topo):
                      params1={'ip': '1.1.2.1/24'},
                      params2={'ip': '1.1.2.2/24'})
         
+        self.addLink(r1,
+                     r5,
+                     intfName1='r1-r5',
+                     intfName2='r5-r1',
+                     params1={'ip': '1.1.5.1/24'},
+                     params2={'ip': '1.1.5.2/24'})
+        
         self.addLink(r2,
                      r3,
                      intfName1='r2-r3',
                      intfName2='r3-r2',
                      params1={'ip': '1.2.3.1/24'},
                      params2={'ip': '1.2.3.2/24'})
-        self.addLink(r1,
-                     r3,
-                     intfName1='r1-r3',
-                     intfName2='r3-r1',
-                     params1={'ip': '1.1.3.1/24'},
-                     params2={'ip': '1.1.3.2/24'})
+        
+        self.addLink(r2,
+                     r4,
+                     intfName1='r2-r4',
+                     intfName2='r4-r2',
+                     params1={'ip': '1.2.4.1/24'},
+                     params2={'ip': '1.2.4.2/24'})
+        
+        self.addLink(r3,
+                     r4,
+                     intfName1='r3-r4',
+                     intfName2='r4-r3',
+                     params1={'ip': '1.3.4.1/24'},
+                     params2={'ip': '1.3.4.2/24'})
+        
+        self.addLink(r4,
+                     r5,
+                     intfName1='r4-r5',
+                     intfName2='r5-r4',
+                     params1={'ip': '1.4.5.1/24'},
+                     params2={'ip': '1.4.5.2/24'})
         
         # can make all the routers connect to a switch in the same subnet
         # ex: 192.168.0.0 <-- causal_tel server
@@ -90,18 +115,18 @@ def main():
     bgp_topo = BGPTopo()
     net = Mininet(topo = bgp_topo, autoSetMacs = True)
 
-    # Add routing for reaching networks that aren't directly connected
-    # command to add connectivity between r1 subnet and r2 subnet
-    # info(net['r1'].cmd("ip route add 10.0.1.0/24 via 1.1.2.2"))
-    # info(net['r2'].cmd("ip route add 10.0.0.0/24 via 1.1.2.1"))
     print("NET LINKS")
-    print(bgp_topo.links())
+    info(bgp_topo.links())
 
     net.start()
 
-    net[ 'r1' ].popen('python3 -u simpleBGP.py --ip 10.0.1.0/24 --neighbor 1.1.2.2 true 100 --neighbor 1.1.3.2 true 120', stdout=sys.stdout, stderr=sys.stdout)
-    net[ 'r2' ].popen('python3 -u simpleBGP.py --ip 10.0.2.0/24 --neighbor 1.1.2.1 false 100 --neighbor 1.2.3.2 true 100', stdout=sys.stdout, stderr=sys.stdout)
-    net[ 'r3' ].popen('python3 -u simpleBGP.py --ip 10.0.3.0/24 --neighbor 1.2.3.1 false 100 --neighbor 1.1.3.1 false 100', stdout=sys.stdout, stderr=sys.stdout)
+    # TODO: Make sure true falses are correct. should be exactly 1 true and 1 false per neighbor pair
+    net[ 'r1' ].popen('python3 -u simpleBGP.py --ip 10.0.1.0/24 --neighbor 1.1.2.2 true 100 --neighbor 1.1.5.2 true 100', stdout=sys.stdout, stderr=sys.stdout)
+    net[ 'r2' ].popen('python3 -u simpleBGP.py --ip 10.0.2.0/24 --neighbor 1.1.2.1 false 100 --neighbor 1.2.3.2 true 100 --neighbor 1.2.4.2 true 100', stdout=sys.stdout, stderr=sys.stdout)
+    net[ 'r3' ].popen('python3 -u simpleBGP.py --ip 10.0.3.0/24 --neighbor 1.2.3.1 false 100 --neighbor 1.3.4.2 true 100', stdout=sys.stdout, stderr=sys.stdout)
+    net[ 'r4' ].popen('python3 -u simpleBGP.py --ip 10.0.4.0/24 --neighbor 1.2.4.1 false 100 --neighbor 1.3.4.1 false 100 --neighbor 1.4.5.2 true 100', stdout=sys.stdout, stderr=sys.stdout)
+    net[ 'r5' ].popen('python3 -u simpleBGP.py --ip 10.0.5.0/24 --neighbor 1.1.5.1 false 100 --neighbor 1.4.5.1 false 100', stdout=sys.stdout, stderr=sys.stdout)
+    
     net[ 'server' ].popen('python3 -u CausalServer.py',stdout=sys.stdout, stderr=sys.stdout)
 
     CLI(net)
