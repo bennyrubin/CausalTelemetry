@@ -210,6 +210,7 @@ def select_route(sockets, prefix, neighbor_from):
     print(f"ASN {ASN} add route to {best_key.prefix} via {best_key.next_hop}\n")
     command = f"ip route add {best_key.prefix} via {best_key.next_hop} src {SOURCE}"
     subprocess.run(command, shell=True)
+    log_internal(command)
 
     # send announcements for neighbors. 
     for sock in sockets:
@@ -283,6 +284,7 @@ def process_updates(sockets, updates):
         elif action == "withdraw":
             command = f"ip route del {rib_entry.prefix}"
             subprocess.run(command, shell=True)
+            log_internal(command)
             key = TableKey(rib_entry.prefix, rib_entry.next_hop)
             print(f"asn {ASN} withdraw route key: {key}")
             if key in RIBTable:
@@ -388,6 +390,7 @@ def main():
                     if val.selected: # if it's selected then need to remove from kernel routing table and RIBTable and call select route
                         command = f"ip route del {key.prefix}"
                         subprocess.run(command, shell=True)
+                        log_internal("disconnect: " + command)
                         del RIBTable[key]
                         select_route(sockets, key.prefix, key.next_hop)
                     else: # otherwise just need to remove it 

@@ -44,6 +44,7 @@ class SpaceTime():
             self.data[event.node_id] = []
             events = self.data.get(event.node_id)
         bisect.insort(events, event, key=lambda x: x.timestamp)
+
     
     def happened_before(self, ev1, ev2):
         pass                
