@@ -2,6 +2,8 @@ from __future__ import annotations
 import socket
 import bisect
 import time
+from datetime import datetime
+import pickle
 
 class ReceiveEvent():
     def __init__(self, node_id, timestamp, data, send:SendEvent = None):
@@ -27,7 +29,7 @@ class SendEvent():
         return f"id: {self.node_id}; timestamp: {self.timestamp}; data: {self.data}; recv: ({self.recv_event.node_id},{self.recv_event.timestamp})"
 
 class InternalEvent():
-    def __init__(self, node_id, data, timestamp):
+    def __init__(self, node_id, timestamp, data):
         self.node_id = node_id
         self.timestamp = int(timestamp)
         self.data = data
@@ -85,8 +87,14 @@ def handle_log(diagram:SpaceTime, log):
         diagram.insertEvent(send_event)
     elif event_type == "internal":
         node_id, timestamp = data[1].split(",")
+        print(f"timestamp: {timestamp}")
         message = " ".join(data[2:])
+        print(f" message : {message}")
         diagram.insertEvent(InternalEvent(node_id, timestamp, message))
+
+
+def write_log_pickle():
+    pass
 
 def main():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -94,7 +102,7 @@ def main():
 
     diagram = SpaceTime()
 
-    future = time.time() + 4
+    future = time.time() + 10
     done = False
     server_socket.settimeout(2)
     while True:
@@ -105,6 +113,8 @@ def main():
                 done = True
                 for key, value in diagram.data.items():
                     print(f"key: {key}, value: {value}")
+                with open('diagram','wb+') as f:
+                    pickle.dump(diagram, f)
             continue
 
         # message looks like
@@ -114,7 +124,6 @@ def main():
         log = log.decode()
 
         handle_log(diagram, log)
-
 
 
 

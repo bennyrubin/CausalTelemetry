@@ -109,9 +109,30 @@ def get_eventID():
     logical_clock += 1
     return id
 
+def replace_local_AS(message):
+    new_msg = ""
+    words = message.split(" ")
+    if words[0] == "internal":
+        idx = message.find("via") + 4
+        left = message[:idx]
+        right = message[idx:]
+        words = right.split(" ")
+        nums = words[0].split(".")
+        words[0] = nums[int(nums[3])]
+        
+        return left + " ".join(words)
+    else:
+        nums = words[-2].split(".")
+        words[-2] = nums[int(nums[3])]
+        return " ".join(words)
+
 def send_server(message):
     causal_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     addr = (SERVER_IP, 55555)
+    # sockname = sock.getsockname()[0]
+    # nums = sockname.split(".")
+    # next_hop = nums[nums[3]]
+    message = replace_local_AS(message)
     causal_socket.sendto(message.encode(), addr)
     
 def log_send(message):
@@ -135,7 +156,7 @@ def log_recv(updates):
         stripped_updates.append(stripped_update)
         message = f"receive {send_eventID} {get_eventID()} {stripped_update}"
         send_server(message)
-        logical_clock += 1
+        #logical_clock += 1
     # every receive should parse the embed event ID 
     # TODO: grab the info I need and then strip it before returning it
     return stripped_updates
@@ -356,7 +377,6 @@ def main():
     time.sleep(.5)
     future = time.time() + 3
     sent = False
-    message = b'test'
     # main loop for running BGP
     while True:
         read_sockets, write_sockets, error_sockets = select.select(sockets, [], [], .5)
