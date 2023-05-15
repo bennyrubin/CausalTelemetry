@@ -4,6 +4,7 @@ import time
 import socket
 import select
 import subprocess
+import traceback
 
 
 class RIBEntry():
@@ -112,13 +113,15 @@ def get_eventID():
 def replace_local_AS(message):
     new_msg = ""
     words = message.split(" ")
-    if words[0] == "internal":
+    if "disconnect" in message or "del" in message:
+        return message
+    elif words[0] == "internal":
         idx = message.find("via") + 4
         left = message[:idx]
         right = message[idx:]
         words = right.split(" ")
         nums = words[0].split(".")
-        words[0] = nums[int(nums[3])]
+        words[0] = str(int(nums[int(nums[3])]) - 1)
         
         return left + " ".join(words)
     else:

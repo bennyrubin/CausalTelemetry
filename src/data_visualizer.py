@@ -1,11 +1,13 @@
 from CausalServer import *
 import networkx as nx
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 import pickle
 
 file = "data/diagram_2r"
-file = "data/diagram_3r"
-file = "data/diagram_bug"
+file = "data/diagram_bug2"
+file = "data/diagram_bug1"
+file = "data/diagram_3r_2"
+
 
 
 def convertToGraph():
@@ -40,9 +42,12 @@ def convertToGraph():
     for node in G:
         color_map.append(G.nodes[node]['color'])
     flipped_pos = {node: (x,-y) for (node, (x,y)) in pos.items()}
+    plt.figure(figsize=(18,18))
     nx.draw(G,flipped_pos,node_color = color_map,with_labels=False)
     nx.draw_networkx_labels(G,flipped_pos,labels)
+    plt.savefig("graph_3r.png", dpi=1000, format="PNG")
     plt.show()
+    
 
 
 def onlyInternal():
@@ -80,7 +85,9 @@ def onlyInternal():
     flipped_pos = {node: (x,-y) for (node, (x,y)) in pos.items()}
     nx.draw(G,flipped_pos,node_color = color_map,with_labels=False)
     nx.draw_networkx_labels(G,flipped_pos,labels)
-    plt.show()
+    #plt.show()
+    plt.savefig("graph.pdf")
+
 
 
 def main():

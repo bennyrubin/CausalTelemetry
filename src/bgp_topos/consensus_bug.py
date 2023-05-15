@@ -127,7 +127,7 @@ def main():
 
     # TODO: Make sure true falses are correct. should be exactly 1 true and 1 false per neighbor pair
     net[ 'r1' ].popen('python3 -u simpleBGP.py --ip 10.0.1.0/24 --neighbor 1.1.2.2 true 100 --neighbor 1.1.5.2 true 100', stdout=out, stderr=out)
-    net[ 'r2' ].popen('python3 -u simpleBGP.py --ip 10.0.2.0/24 --neighbor 1.1.2.1 false 100 --neighbor 1.2.3.2 true 100 --neighbor 1.2.4.2 true 100', stdout=out, stderr=out)
+    net[ 'r2' ].popen('python3 -u simpleBGP.py --ip 10.0.2.0/24 --neighbor 1.1.2.1 false 100 --neighbor 1.2.3.2 true 120 --neighbor 1.2.4.2 true 110', stdout=out, stderr=out)
     net[ 'r3' ].popen('python3 -u simpleBGP.py --ip 10.0.3.0/24 --neighbor 1.2.3.1 false 100 --neighbor 1.3.4.2 true 100', stdout=out, stderr=out)
     net[ 'r4' ].popen('python3 -u simpleBGP.py --ip 10.0.4.0/24 --neighbor 1.2.4.1 false 100 --neighbor 1.3.4.1 false 100 --neighbor 1.4.5.2 true 100', stdout=out, stderr=out)
     net[ 'r5' ].popen('python3 -u simpleBGP.py --ip 10.0.5.0/24 --neighbor 1.1.5.1 false 100 --neighbor 1.4.5.1 false 100', stdout=out, stderr=out)

@@ -17,7 +17,7 @@ class ReceiveEvent():
     def __repr__(self):
         return f"id: {self.node_id}; timestamp: {self.timestamp}; data: {self.data}; send: ({self.send_event.node_id},{self.send_event.timestamp})"
     
-
+    
 class SendEvent():
     def __init__(self, node_id, timestamp, data, recv: ReceiveEvent = None):
         self.node_id = node_id
@@ -102,17 +102,18 @@ def main():
 
     diagram = SpaceTime()
 
-    future = time.time() + 10
+    future = time.time() + 5
     done = False
     server_socket.settimeout(2)
     while True:
         try: 
             log, address = server_socket.recvfrom(1024)
         except TimeoutError as err:
-            if time.time() > future and not done:
-                done = True
-                for key, value in diagram.data.items():
-                    print(f"key: {key}, value: {value}")
+            if time.time() > future:
+                future = time.time() + 5
+                # for key, value in diagram.data.items():
+                #     print(f"key: {key}, value: {value}")
+                #print("SAVING DIAGRAM")
                 with open('diagram','wb+') as f:
                     pickle.dump(diagram, f)
             continue
